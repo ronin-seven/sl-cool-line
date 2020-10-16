@@ -1,4 +1,4 @@
-local CoolLine = CreateFrame("Frame", "CoolLine", UIParent)
+local CoolLine = CreateFrame("Frame", "CoolLine", UIParent, BackdropTemplateMixin and "BackdropTemplate")
 CoolLine:SetScript("OnEvent", function(this, event, ...)
 	this[event](this, ...)
 end)
@@ -90,12 +90,12 @@ function CoolLine:ADDON_LOADED(a1)
 			[GetSpellInfo(50977) or "Death Gate"] = 11,
 			[GetSpellInfo(43265) or "Death and Decay"] = 11,
 			[GetSpellInfo(42650) or "Army of the Dead"] = 11,
---			[GetSpellInfo(47476) or "Strangulate"] = 11,
---			[GetSpellInfo(51052) or "Anti-Magic Zone"] = 11,
---			[GetSpellInfo(63560) or "Dark Transformation"] = 10,
+--          [GetSpellInfo(47476) or "Strangulate"] = 11,
+--          [GetSpellInfo(51052) or "Anti-Magic Zone"] = 11,
+--          [GetSpellInfo(63560) or "Dark Transformation"] = 10,
 			[GetSpellInfo(49184) or "Howling Blast"] = 8,
---			[GetSpellInfo(51271) or "Pillar of Frost"] = 11,
---			[GetSpellInfo(55233) or "Vampiric Blood"] = 11,
+--          [GetSpellInfo(51271) or "Pillar of Frost"] = 11,
+--          [GetSpellInfo(55233) or "Vampiric Blood"] = 11,
 		}
 		RuneCheck = function(name, duration)
 			local rc = runecd[name]
@@ -196,7 +196,7 @@ function CoolLine:ADDON_LOADED(a1)
 			self.bg:SetTexCoord(0,1, 0,1)
 		end
 
-		self.border = self.border or CreateFrame("Frame", nil, self)
+		self.border = self.border or CreateFrame("Frame", nil, self, BackdropTemplateMixin and "BackdropTemplate")
 		self.border:SetPoint("TOPLEFT", -db.borderinset, db.borderinset) -- Implemented 'insets'
 		self.border:SetPoint("BOTTOMRIGHT", db.borderinset, -db.borderinset) -- Implemented 'insets'
 
@@ -408,7 +408,7 @@ local function NewCooldown(name, icon, endtime, isplayer)
 	if not f then
 		f = f or tremove(frames)
 		if not f then
-			f = CreateFrame("Frame", nil, CoolLine.border)
+			f = CreateFrame("Frame", nil, CoolLine.border, BackdropTemplateMixin and "BackdropTemplate")
 			f:SetBackdrop(iconback)
 			f.icon = f:CreateTexture(nil, "ARTWORK")
 			f.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
@@ -439,51 +439,57 @@ CoolLine.NewCooldown, CoolLine.ClearCooldown = NewCooldown, ClearCooldown
 
 do  -- cache spells that have a cooldown
 	local GetSpellBookItemName, GetSpellBookItemInfo, GetSpellBaseCooldown, GetSpellCharges
-	    = GetSpellBookItemName, GetSpellBookItemInfo, GetSpellBaseCooldown, GetSpellCharges
+		= GetSpellBookItemName, GetSpellBookItemInfo, GetSpellBaseCooldown, GetSpellCharges
 
 	local function CacheBook(btype)
 		local lastID
 		local sb = spells[btype]
-		local _, _, offset, numSpells = GetSpellTabInfo(2)
-		for i = 1, offset + numSpells do
-			local spellName = GetSpellBookItemName(i, btype)
-			if not spellName then break end
-			local spellType, spellID = GetSpellBookItemInfo(i, btype)
-			if spellID and spellType == "FLYOUT" then
-				local _, _, numSlots, isKnown = GetFlyoutInfo(spellID)
-				if isKnown then
-					for j = 1, numSlots do
-						local flyID, _, _, flyName = GetFlyoutSlotInfo(spellID, j)
-						lastID = flyID
-						if flyID then
-							local flyCD = GetSpellBaseCooldown(flyID)
-							if flyCD and flyCD > 2499 then
-								sb[flyID] = flyName -- specialspells[flyID] or flyName
+		local numOfSpellTabs = GetNumSpellTabs()
+		
+		for spellTabIdx = 2, numOfSpellTabs do
+			local _, _, offset, numSpells, _, offspecId = GetSpellTabInfo(spellTabIdx)
+			if offspecId == 0 then
+				for i = 1, offset + numSpells do
+					local spellName = GetSpellBookItemName(i, btype)
+					if not spellName then break end
+					local spellType, spellID = GetSpellBookItemInfo(i, btype)
+					if spellID and spellType == "FLYOUT" then
+						local _, _, numSlots, isKnown = GetFlyoutInfo(spellID)
+						if isKnown then
+							for j = 1, numSlots do
+								local flyID, _, _, flyName = GetFlyoutSlotInfo(spellID, j)
+								lastID = flyID
+								if flyID then
+									local flyCD = GetSpellBaseCooldown(flyID)
+									if flyCD and flyCD > 2499 then
+										sb[flyID] = flyName -- specialspells[flyID] or flyName
+									end
+								end
 							end
 						end
-					end
-				end
-			elseif spellID and spellType == "SPELL" and spellID ~= lastID then
-				-- Base spell = slot ID + name from slot ID
-				-- Real spell = ID from slot name + name from slot name
-				-- For the purposes of CoolLine we only care about the real spell.
-				lastID = spellID
-				spellName, _, _, _, _, _, spellID = GetSpellInfo(spellName)
-				if spellID then
-					-- Special spells like warlock Cauterize Master can be in
-					-- a limbo state during loading. Just ignore them in that
-					-- case. The spellbook will update again momentarily and
-					-- they will correctly resolve then.
-					local _, maxCharges = GetSpellCharges(spellID)
-					if maxCharges and maxCharges > 0 then
-						chargespells[btype][spellID] = spellName
-					else
-						local cd = GetSpellBaseCooldown(spellID)
-						if cd and cd > 2499 then
-							sb[spellID] = spellName
-				--			if specialspells[spellName] then
-				--				sb[ specialspells[spellName] ] = spellName
-				--			end
+					elseif spellID and spellType == "SPELL" and spellID ~= lastID then
+						-- Base spell = slot ID + name from slot ID
+						-- Real spell = ID from slot name + name from slot name
+						-- For the purposes of CoolLine we only care about the real spell.
+						lastID = spellID
+						spellName, _, _, _, _, _, spellID = GetSpellInfo(spellName)
+						if spellID then
+							-- Special spells like warlock Cauterize Master can be in
+							-- a limbo state during loading. Just ignore them in that
+							-- case. The spellbook will update again momentarily and
+							-- they will correctly resolve then.
+							local _, maxCharges = GetSpellCharges(spellID)
+							if maxCharges and maxCharges > 0 then
+								chargespells[btype][spellID] = spellName
+							else
+								local cd = GetSpellBaseCooldown(spellID)
+								if cd and cd > 2499 then
+									sb[spellID] = spellName
+						--          if specialspells[spellName] then
+						--              sb[ specialspells[spellName] ] = spellName
+						--          end
+								end
+							end
 						end
 					end
 				end
@@ -692,7 +698,7 @@ function CoolLine:UNIT_SPELLCAST_FAILED(unit, spell, id8)
 		if frame.name == spell then
 			if frame.endtime - GetTime() > 1 then
 				if not failborder then
-					failborder = CreateFrame("Frame", nil, CoolLine.border)
+					failborder = CreateFrame("Frame", nil, CoolLine.border, BackdropTemplateMixin and "BackdropTemplate")
 					failborder:SetBackdrop(iconback)
 					failborder:SetBackdropColor(1, 0, 0, 0.9)
 					failborder:Hide()
