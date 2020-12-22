@@ -3,7 +3,7 @@ CoolLine:SetScript("OnEvent", function(this, event, ...)
 	this[event](this, ...)
 end)
 
-local IS_WOW_8 = GetBuildInfo():match("^8")
+local IS_WOW_8 = GetBuildInfo():match("^[89]")
 
 local smed = LibStub("LibSharedMedia-3.0")
 
@@ -444,52 +444,46 @@ do  -- cache spells that have a cooldown
 	local function CacheBook(btype)
 		local lastID
 		local sb = spells[btype]
-		local numOfSpellTabs = GetNumSpellTabs()
-		
-		for spellTabIdx = 2, numOfSpellTabs do
-			local _, _, offset, numSpells, _, offspecId = GetSpellTabInfo(spellTabIdx)
-			if offspecId == 0 then
-				for i = 1, offset + numSpells do
-					local spellName = GetSpellBookItemName(i, btype)
-					if not spellName then break end
-					local spellType, spellID = GetSpellBookItemInfo(i, btype)
-					if spellID and spellType == "FLYOUT" then
-						local _, _, numSlots, isKnown = GetFlyoutInfo(spellID)
-						if isKnown then
-							for j = 1, numSlots do
-								local flyID, _, _, flyName = GetFlyoutSlotInfo(spellID, j)
-								lastID = flyID
-								if flyID then
-									local flyCD = GetSpellBaseCooldown(flyID)
-									if flyCD and flyCD > 2499 then
-										sb[flyID] = flyName -- specialspells[flyID] or flyName
-									end
-								end
+		local _, _, offset, numSpells = GetSpellTabInfo(GetNumSpellTabs())
+		for i = 1, offset + numSpells do
+			local spellName = GetSpellBookItemName(i, btype)
+			if not spellName then break end
+			local spellType, spellID = GetSpellBookItemInfo(i, btype)
+			if spellID and spellType == "FLYOUT" then
+				local _, _, numSlots, isKnown = GetFlyoutInfo(spellID)
+				if isKnown then
+					for j = 1, numSlots do
+						local flyID, _, _, flyName = GetFlyoutSlotInfo(spellID, j)
+						lastID = flyID
+						if flyID then
+							local flyCD = GetSpellBaseCooldown(flyID)
+							if flyCD and flyCD > 2499 then
+								sb[flyID] = flyName -- specialspells[flyID] or flyName
 							end
 						end
-					elseif spellID and spellType == "SPELL" and spellID ~= lastID then
-						-- Base spell = slot ID + name from slot ID
-						-- Real spell = ID from slot name + name from slot name
-						-- For the purposes of CoolLine we only care about the real spell.
-						lastID = spellID
-						spellName, _, _, _, _, _, spellID = GetSpellInfo(spellName)
-						if spellID then
-							-- Special spells like warlock Cauterize Master can be in
-							-- a limbo state during loading. Just ignore them in that
-							-- case. The spellbook will update again momentarily and
-							-- they will correctly resolve then.
-							local _, maxCharges = GetSpellCharges(spellID)
-							if maxCharges and maxCharges > 0 then
-								chargespells[btype][spellID] = spellName
-							else
-								local cd = GetSpellBaseCooldown(spellID)
-								if cd and cd > 2499 then
-									sb[spellID] = spellName
-						--          if specialspells[spellName] then
-						--              sb[ specialspells[spellName] ] = spellName
-						--          end
-								end
-							end
+					end
+				end
+			elseif spellID and (spellType == "SPELL" or spellType == "PETACTION") and spellID ~= lastID then
+				-- Base spell = slot ID + name from slot ID
+				-- Real spell = ID from slot name + name from slot name
+				-- For the purposes of CoolLine we only care about the real spell.
+				lastID = spellID
+				spellName, _, _, _, _, _, spellID = GetSpellInfo(spellName)
+				if spellID then
+					-- Special spells like warlock Cauterize Master can be in
+					-- a limbo state during loading. Just ignore them in that
+					-- case. The spellbook will update again momentarily and
+					-- they will correctly resolve then.
+					local _, maxCharges = GetSpellCharges(spellID)
+					if maxCharges and maxCharges > 0 then
+						chargespells[btype][spellID] = spellName
+					else
+						local cd = GetSpellBaseCooldown(spellID)
+						if cd and cd > 2499 then
+							sb[spellID] = spellName
+				--          if specialspells[spellName] then
+				--              sb[ specialspells[spellName] ] = spellName
+				--          end
 						end
 					end
 				end
